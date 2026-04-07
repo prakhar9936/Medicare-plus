@@ -167,11 +167,11 @@
                             <h6>HOME</h6>
                         </a>
                     </li>
-                    <li class="nav-item" style="margin-right:40px;">
+                    <!-- <li class="nav-item" style="margin-right:40px;">
                         <a class="nav-link" href="services.html" style="color:white;">
                             <h6>ABOUT US</h6>
                         </a>
-                    </li>
+                    </li> -->
                     <li class="nav-item">
                         <a class="nav-link" href="contact.html" style="color:white;">
                             <h6>CONTACT</h6>
