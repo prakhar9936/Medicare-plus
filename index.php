@@ -502,5 +502,7 @@
     }
     </script>
 
+    <?php include('chatbot.php'); ?>
+
 </body>
 </html>
