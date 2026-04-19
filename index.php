@@ -177,6 +177,11 @@
                             <h6>CONTACT</h6>
                         </a>
                     </li>
+                    <li class="nav-item" style="margin-left:30px;">
+                        <a class="nav-link" href="ambulance.php" style="color:white;">
+                            <h6>🚑 AMBULANCE</h6>
+                        </a>
+
                 </ul>
             </div>
         </div>

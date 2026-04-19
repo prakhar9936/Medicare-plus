@@ -54,6 +54,23 @@ if(isset($_POST['docsub1'])) {
     }
     mysqli_stmt_close($deleteDoctorStatement);
 }
+
+// Ambulance: Update Status
+if(isset($_POST['amb_status_update'])) {
+    $ambId     = (int)$_POST['amb_id'];
+    $newStatus = mysqli_real_escape_string($databaseConnection, $_POST['new_status']);
+    $allowed   = ['Pending','Dispatched','Completed','Cancelled'];
+    if(in_array($newStatus, $allowed)) {
+        mysqli_query($databaseConnection,
+            "UPDATE ambulancetb SET status='$newStatus' WHERE id=$ambId");
+    }
+}
+
+// Ambulance: Delete Request
+if(isset($_GET['del_amb'])) {
+    $ambId = (int)$_GET['del_amb'];
+    mysqli_query($databaseConnection, "DELETE FROM ambulancetb WHERE id=$ambId");
+}
 ?>
 
 <html lang="en">
@@ -178,6 +195,31 @@ if(isset($_POST['docsub1'])) {
 
         #inputbtn:hover { cursor: pointer; }
         button:hover    { cursor: pointer; }
+
+        /* ── Ambulance Tab Styles ── */
+        .amb-pending-alert {
+            background: #fff3e0;
+            border-left: 4px solid #e65100;
+            color: #e65100;
+            font-weight: 600;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+        .amb-table thead {
+            background: linear-gradient(to right, #b71c1c, #880e4f) !important;
+        }
+        .amb-status-badge {
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #fff;
+        }
+        .status-pending    { background: #ff8f00; }
+        .status-dispatched { background: #1565c0; }
+        .status-completed  { background: #2e7d32; }
+        .status-cancelled  { background: #757575; }
     </style>
 
     <script>
@@ -282,6 +324,11 @@ if(isset($_POST['docsub1'])) {
                        id="list-mes-list" role="tab">
                         <i class="fa fa-envelope"></i> Queries
                     </a>
+                    <a class="list-group-item list-group-item-action"
+                       data-toggle="list" href="#list-ambulance"
+                       id="list-ambulance-list" role="tab">
+                        <i class="fa fa-ambulance"></i> Ambulance Requests
+                    </a>
                 </div>
             </div>
 
@@ -367,6 +414,19 @@ if(isset($_POST['docsub1'])) {
                                     <a href="#list-mes"
                                        onclick="clickTab('#list-mes-list')">
                                         View Queries
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="dashboard-card">
+                                    <div class="card-icon" style="color:#b71c1c;">
+                                        <i class="fa fa-ambulance"></i>
+                                    </div>
+                                    <h4 style="color:#b71c1c;">Ambulance Requests</h4>
+                                    <a href="#list-ambulance"
+                                       onclick="clickTab('#list-ambulance-list')"
+                                       style="color:#b71c1c;">
+                                        View Requests
                                     </a>
                                 </div>
                             </div>
@@ -528,7 +588,6 @@ if(isset($_POST['docsub1'])) {
                                     $appointmentQuery
                                 );
                                 while ($appointmentRow = mysqli_fetch_array($appointmentResult)) {
-                                    // Determine appointment status
                                     $userStatus   = $appointmentRow['userStatus'];
                                     $doctorStatus = $appointmentRow['doctorStatus'];
 
@@ -756,6 +815,126 @@ if(isset($_POST['docsub1'])) {
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- ── Ambulance Requests Tab ── -->
+                    <div class="tab-pane fade" id="list-ambulance" role="tabpanel">
+                        <h5 style="color:#b71c1c; font-weight:700; margin-bottom:20px;">
+                            <i class="fa fa-ambulance"></i> Ambulance Requests
+                        </h5>
+
+                        <?php
+                        $pendingResult = mysqli_query($databaseConnection,
+                            "SELECT COUNT(*) as cnt FROM ambulancetb WHERE status='Pending'");
+                        $pendingRow   = mysqli_fetch_assoc($pendingResult);
+                        $pendingCount = $pendingRow['cnt'];
+
+                        if ($pendingCount > 0) {
+                            echo "<div class='amb-pending-alert'>
+                                    <i class='fa fa-exclamation-circle'></i>
+                                    &nbsp; {$pendingCount} request(s) are PENDING and need attention.
+                                  </div>";
+                        }
+                        ?>
+
+                        <div style="overflow-x:auto;">
+                            <table class="table table-hover table-bordered amb-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Caller Name</th>
+                                        <th>Contact</th>
+                                        <th>Pickup Address</th>
+                                        <th>Drop Location</th>
+                                        <th>Emergency Type</th>
+                                        <th>Patient Condition</th>
+                                        <th>Booked At</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php
+                                $ambResult = mysqli_query($databaseConnection,
+                                    "SELECT * FROM ambulancetb ORDER BY booked_at DESC");
+
+                                if (mysqli_num_rows($ambResult) === 0) {
+                                    echo "<tr><td colspan='10' class='text-center text-muted'
+                                               style='padding:30px;'>
+                                            No ambulance requests yet.
+                                          </td></tr>";
+                                }
+
+                                while ($amb = mysqli_fetch_assoc($ambResult)) {
+                                    $statusClass = match($amb['status']) {
+                                        'Pending'    => 'status-pending',
+                                        'Dispatched' => 'status-dispatched',
+                                        'Completed'  => 'status-completed',
+                                        'Cancelled'  => 'status-cancelled',
+                                        default      => ''
+                                    };
+
+                                    $condition = empty($amb['patient_condition'])
+                                        ? '<em class="text-muted">—</em>'
+                                        : htmlspecialchars($amb['patient_condition']);
+
+                                    $bookedAt = date('d M Y, h:i A',
+                                        strtotime($amb['booked_at']));
+
+                                    $selPending    = $amb['status']=='Pending'    ? 'selected' : '';
+                                    $selDispatched = $amb['status']=='Dispatched' ? 'selected' : '';
+                                    $selCompleted  = $amb['status']=='Completed'  ? 'selected' : '';
+                                    $selCancelled  = $amb['status']=='Cancelled'  ? 'selected' : '';
+
+                                    echo "
+                                    <tr>
+                                        <td>{$amb['id']}</td>
+                                        <td><strong>" . htmlspecialchars($amb['caller_name']) . "</strong></td>
+                                        <td>" . htmlspecialchars($amb['contact']) . "</td>
+                                        <td>" . htmlspecialchars($amb['pickup_address']) . "</td>
+                                        <td>" . htmlspecialchars($amb['drop_location']) . "</td>
+                                        <td><span class='badge badge-danger'>"
+                                            . htmlspecialchars($amb['emergency_type'])
+                                            . "</span></td>
+                                        <td>{$condition}</td>
+                                        <td>{$bookedAt}</td>
+                                        <td>
+                                            <span class='amb-status-badge {$statusClass}'>
+                                                {$amb['status']}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <form method='post' action='admin-panel1.php'
+                                                  style='display:inline-flex; gap:4px; align-items:center;'>
+                                                <input type='hidden' name='amb_id' value='{$amb['id']}'/>
+                                                <select name='new_status'
+                                                        class='form-control form-control-sm'
+                                                        style='width:120px;'>
+                                                    <option value='Pending'    {$selPending}>Pending</option>
+                                                    <option value='Dispatched' {$selDispatched}>Dispatched</option>
+                                                    <option value='Completed'  {$selCompleted}>Completed</option>
+                                                    <option value='Cancelled'  {$selCancelled}>Cancelled</option>
+                                                </select>
+                                                <button type='submit' name='amb_status_update'
+                                                        class='btn btn-sm btn-primary'
+                                                        title='Update Status'>
+                                                    <i class='fa fa-refresh'></i>
+                                                </button>
+                                            </form>
+                                            <a href='admin-panel1.php?del_amb={$amb['id']}'
+                                               class='btn btn-sm btn-danger'
+                                               onclick=\"return confirm('Delete this ambulance request?');\"
+                                               title='Delete'>
+                                                <i class='fa fa-trash'></i>
+                                            </a>
+                                        </td>
+                                    </tr>";
+                                }
+                                ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- ── End Ambulance Requests Tab ── -->
 
                 </div>
             </div>
